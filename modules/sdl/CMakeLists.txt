@@ -1,6 +1,11 @@
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(SDL2 sdl2)
+if (NOT SDL2_FOUND)
+    pkg_check_modules(SDL2 IMPORTED_TARGET sdl2)
+    if (TARGET PkgConfig::SDL2)
+        set(SDL2_LIBRARIES PkgConfig::SDL2)
+    endif ()
+endif ()
 
 if (NOT SDL2_FOUND)
     return()
