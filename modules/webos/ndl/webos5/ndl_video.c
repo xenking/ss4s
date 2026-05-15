@@ -5,9 +5,11 @@ static SS4S_VideoOpenResult ReloadWithSize(SS4S_PlayerContext *context, int widt
 
 static uint64_t GetTimeUs();
 
+static bool SetDisplayArea(SS4S_VideoInstance *instance, const SS4S_VideoRect *src, const SS4S_VideoRect *dst);
+
 static bool GetCapabilities(SS4S_VideoCapabilities *capabilities) {
     capabilities->codecs = SS4S_VIDEO_H264 | SS4S_VIDEO_H265 | SS4S_VIDEO_VP9 | SS4S_VIDEO_AV1;
-    capabilities->transform = SS4S_VIDEO_CAP_TRANSFORM_UI_COMPOSITING;
+    capabilities->transform = SS4S_VIDEO_CAP_TRANSFORM_UI_COMPOSITING | SS4S_VIDEO_CAP_TRANSFORM_AREA_DEST;
     capabilities->maxBitrate = 65000;
     capabilities->suggestedBitrate = 35000;
     capabilities->hdr = true;
@@ -147,6 +149,38 @@ static bool SetHDRInfo(SS4S_VideoInstance *instance, const SS4S_VideoHDRInfo *in
     return NDL_DirectVideoSetHDRInfo(hdrInfo) == 0;
 }
 
+static bool SetDisplayArea(SS4S_VideoInstance *instance, const SS4S_VideoRect *src, const SS4S_VideoRect *dst) {
+    SS4S_PlayerContext *context = (void *) instance;
+    int left = 0;
+    int top = 0;
+    int width;
+    int height;
+    int rc;
+
+    (void) src;
+    if (dst != NULL) {
+        left = dst->x;
+        top = dst->y;
+        width = dst->width;
+        height = dst->height;
+    } else {
+        width = context->mediaInfo.video.width;
+        height = context->mediaInfo.video.height;
+    }
+    if (width <= 0 || height <= 0) {
+        return false;
+    }
+
+    pthread_mutex_lock(&SS4S_NDL_webOS5_Lock);
+    rc = NDL_DirectVideoSetArea(left, top, width, height);
+    pthread_mutex_unlock(&SS4S_NDL_webOS5_Lock);
+
+    SS4S_NDL_webOS5_Log(rc == 0 ? SS4S_LogLevelInfo : SS4S_LogLevelWarn, "NDL",
+                        "NDL_DirectVideoSetArea(%d, %d, %d, %d) => %d",
+                        left, top, width, height, rc);
+    return rc == 0;
+}
+
 static void CloseVideo(SS4S_VideoInstance *instance) {
     SS4S_NDL_webOS5_Log(SS4S_LogLevelInfo, "NDL", "CloseVideo called");
     pthread_mutex_lock(&SS4S_NDL_webOS5_Lock);
@@ -184,5 +218,6 @@ const SS4S_VideoDriver SS4S_NDL_webOS5_VideoDriver = {
         .Feed = FeedVideo,
         .SizeChanged = SizeChanged,
         .SetHDRInfo = SetHDRInfo,
+        .SetDisplayArea = SetDisplayArea,
         .Close = CloseVideo,
 };

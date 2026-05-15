@@ -47,9 +47,19 @@ static SS4S_PlayerContext *CreatePlayerContext(SS4S_Player *player) {
 
 static void DestroyPlayerContext(SS4S_PlayerContext *context) {
     UnloadMedia(context);
-    free(context);
     assert(context == ActivatePlayerContext);
     ActivatePlayerContext = NULL;
+    if (SS4S_NDL_webOS5_Initialized) {
+        /*
+         * DirectMedia unload completes asynchronously on webOS. Give the platform
+         * a short drain window, then release the global DirectMedia driver so TV
+         * audio is not left captured after the stream closes. The next stream
+         * reinitializes it in LoadMedia().
+         */
+        usleep(250 * 1000);
+        SS4S_NDL_webOS5_Driver_Quit();
+    }
+    free(context);
 }
 
 static void PlayerSetWaitAudioVideoReady(SS4S_PlayerContext *context, bool option) {
